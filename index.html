@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Mis Gastos</title>
+
+<!-- PWA / iOS home screen setup -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#26221F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gastos">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --paper:#F6F1E7;
+    --paper-shadow:#E8E0CE;
+    --ink:#26221F;
+    --ink-soft:#5B554D;
+    --line:#D8CFBE;
+    --stamp:#B33A3A;
+    --stamp-dark:#8F2C2C;
+    --ledger:#4F7A5B;
+    --radius:18px;
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  html,body{
+    margin:0; padding:0;
+    background:var(--ink);
+    color:var(--ink);
+    font-family:'Archivo',system-ui,sans-serif;
+    min-height:100vh;
+  }
+
+  body{
+    display:flex;
+    justify-content:center;
+    padding: max(20px, env(safe-area-inset-top)) 14px max(28px, env(safe-area-inset-bottom));
+  }
+
+  .receipt{
+    width:100%;
+    max-width:420px;
+    background:var(--paper);
+    border-radius:6px;
+    position:relative;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,.6);
+    padding-bottom:26px;
+  }
+
+  /* torn perforation top edge */
+  .tear-top, .tear-bottom{
+    height:14px;
+    width:100%;
+    background:
+      radial-gradient(circle at 10px 0, transparent 9px, var(--paper) 9.5px) top/20px 14px repeat-x;
+  }
+  .tear-top{
+    background:
+      radial-gradient(circle at 10px 14px, transparent 9px, var(--paper) 9.5px) top/20px 14px repeat-x;
+    margin-top:-1px;
+  }
+
+  header.till{
+    text-align:center;
+    padding: 4px 24px 14px;
+    border-bottom: 2px dashed var(--line);
+  }
+  header.till .brand{
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:700;
+    letter-spacing:.14em;
+    font-size:13px;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+  }
+  header.till h1{
+    margin:6px 0 4px;
+    font-size:26px;
+    font-weight:800;
+    letter-spacing:-.01em;
+  }
+  header.till .today{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+
+  form{ padding: 20px 22px 4px; }
+
+  .amount-row{
+    display:flex;
+    align-items:stretch;
+    gap:10px;
+    margin-bottom:22px;
+  }
+  .amount-wrap{
+    flex:1;
+    display:flex;
+    align-items:baseline;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:6px;
+  }
+  .amount-wrap .sign{
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:700;
+    font-size:26px;
+    color:var(--stamp);
+    margin-right:4px;
+  }
+  #amount{
+    flex:1;
+    width:100%;
+    border:none;
+    background:transparent;
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:700;
+    font-size:38px;
+    color:var(--ink);
+    outline:none;
+    min-width:0;
+  }
+  #amount::placeholder{ color:#C9C2B5; }
+
+  select.currency{
+    appearance:none;
+    -webkit-appearance:none;
+    background:var(--ink);
+    color:var(--paper);
+    border:none;
+    border-radius:10px;
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:700;
+    font-size:14px;
+    padding:0 30px 0 14px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--paper) 50%), linear-gradient(135deg, var(--paper) 50%, transparent 50%);
+    background-position: calc(100% - 16px) center, calc(100% - 11px) center;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat:no-repeat;
+  }
+
+  fieldset{
+    border:none;
+    padding:0;
+    margin:0 0 20px;
+  }
+  legend{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    padding:0 0 9px;
+  }
+
+  .chips{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .chip{
+    position:relative;
+    border:1.5px solid var(--ink);
+    border-radius:8px;
+    padding:9px 13px;
+    font-family:'Archivo',sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    color:var(--ink);
+    background:transparent;
+    cursor:pointer;
+    transition: transform .08s ease;
+  }
+  .chip:active{ transform:scale(.96); }
+  .chip.selected{
+    background:var(--ink);
+    color:var(--paper);
+  }
+  .chip.selected.stamped::after{
+    content:"✓";
+    margin-left:6px;
+    color:var(--stamp);
+    font-weight:800;
+  }
+
+  .date-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    border-bottom:1.5px dashed var(--line);
+    padding-bottom:10px;
+  }
+  .date-row label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  #date{
+    border:none;
+    background:transparent;
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:600;
+    font-size:15px;
+    color:var(--ink);
+  }
+
+  .submit-wrap{
+    display:flex;
+    justify-content:center;
+    padding: 8px 0 6px;
+  }
+  button.stamp{
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:700;
+    font-size:16px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--paper);
+    background:var(--stamp);
+    border: none;
+    border-radius:10px;
+    padding:16px 20px;
+    width:100%;
+    transform: rotate(-1deg);
+    box-shadow: 0 8px 0 var(--stamp-dark);
+    cursor:pointer;
+    transition: transform .06s ease, box-shadow .06s ease;
+  }
+  button.stamp:active{
+    transform: translateY(6px) rotate(-1deg);
+    box-shadow: 0 2px 0 var(--stamp-dark);
+  }
+  button.stamp:disabled{
+    opacity:.55;
+    cursor:default;
+  }
+
+  .status{
+    text-align:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    min-height:18px;
+    margin-top:12px;
+    color:var(--ink-soft);
+  }
+  .status.ok{ color:var(--ledger); }
+  .status.err{ color:var(--stamp); }
+
+  .ledger{
+    margin: 6px 22px 0;
+    border-top: 2px dashed var(--line);
+    padding-top:14px;
+  }
+  .ledger h2{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin:0 0 10px;
+  }
+  .ledger .row{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    padding:5px 0;
+    color:var(--ink);
+    border-bottom:1px dotted var(--line);
+  }
+  .ledger .row .meta{ color:var(--ink-soft); }
+  .ledger .empty{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    padding:6px 0;
+  }
+  .ledger .total{
+    display:flex;
+    justify-content:space-between;
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:700;
+    font-size:14px;
+    padding-top:10px;
+    margin-top:4px;
+    border-top:2px solid var(--ink);
+  }
+
+  .pending-pill{
+    display:inline-block;
+    margin-top:8px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--stamp);
+  }
+</style>
+</head>
+<body>
+
+<div class="receipt">
+  <div class="tear-top"></div>
+
+  <header class="till">
+    <div class="brand">★ Ticket de gasto ★</div>
+    <h1>Mis Gastos</h1>
+    <div class="today" id="todayLabel"></div>
+  </header>
+
+  <form id="gastoForm">
+    <div class="amount-row">
+      <div class="amount-wrap">
+        <span class="sign">$</span>
+        <input id="amount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required>
+      </div>
+      <select id="currency" class="currency">
+        <option value="MXN">MXN</option>
+        <option value="USD">USD</option>
+        <option value="EUR">EUR</option>
+      </select>
+    </div>
+
+    <fieldset>
+      <legend>Método de pago</legend>
+      <div class="chips" data-group="method">
+        <button type="button" class="chip">Efectivo</button>
+        <button type="button" class="chip">Débito</button>
+        <button type="button" class="chip">Crédito</button>
+        <button type="button" class="chip">Transferencia</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Cuenta</legend>
+      <div class="chips" data-group="account">
+        <button type="button" class="chip">BBVA</button>
+        <button type="button" class="chip">Santander</button>
+        <button type="button" class="chip">Revolut</button>
+        <button type="button" class="chip">Airwallex</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Categoría</legend>
+      <div class="chips" data-group="category">
+        <button type="button" class="chip">Super</button>
+        <button type="button" class="chip">Casa</button>
+        <button type="button" class="chip">Perro</button>
+        <button type="button" class="chip">Viaje</button>
+        <button type="button" class="chip">Curso</button>
+        <button type="button" class="chip">Moncho</button>
+        <button type="button" class="chip">Restaurante</button>
+        <button type="button" class="chip">Uber</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <div class="date-row">
+        <label for="date">Fecha</label>
+        <input id="date" type="date" required>
+      </div>
+    </fieldset>
+
+    <div class="submit-wrap">
+      <button type="submit" class="stamp" id="submitBtn">Registrar</button>
+    </div>
+    <div class="status" id="status"></div>
+  </form>
+
+  <div class="ledger">
+    <h2>Últimos registrados</h2>
+    <div id="recentList"><div class="empty">Aún no hay gastos registrados.</div></div>
+    <div class="total" id="todayTotal" style="display:none;"></div>
+  </div>
+
+  <div class="tear-bottom"></div>
+</div>
+
+<script>
+  // ------------------------------------------------------------------
+  // CONFIGURA AQUÍ la URL de tu Apps Script (Implementar > Aplicación web)
+  // Debe terminar en /exec
+  // ------------------------------------------------------------------
+  const CONFIG = {
+    SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxVoSgIpdMVXS5Q-r00Dggf544yZIJQ9pTjv96rndXNOyFO8GNLPMYdmLjDksj-TIg/exec"
+  };
+
+  const $ = (sel) => document.querySelector(sel);
+  const form = $("#gastoForm");
+  const statusEl = $("#status");
+  const submitBtn = $("#submitBtn");
+  const recentListEl = $("#recentList");
+  const todayTotalEl = $("#todayTotal");
+
+  // ---- default date = today, and a friendly header date ----
+  const todayISO = new Date().toISOString().slice(0, 10);
+  $("#date").value = todayISO;
+  $("#todayLabel").textContent = new Date().toLocaleDateString("es-MX", {
+    weekday: "long", day: "numeric", month: "long"
+  });
+
+  // ---- chip selection logic (single-select per group) ----
+  document.querySelectorAll(".chips").forEach((group) => {
+    group.addEventListener("click", (e) => {
+      const btn = e.target.closest(".chip");
+      if (!btn) return;
+      group.querySelectorAll(".chip").forEach((c) => c.classList.remove("selected", "stamped"));
+      btn.classList.add("selected", "stamped");
+    });
+  });
+
+  function getSelected(groupName) {
+    const group = document.querySelector(`.chips[data-group="${groupName}"]`);
+    const sel = group.querySelector(".chip.selected");
+    return sel ? sel.textContent.trim() : null;
+  }
+
+  // ---- local history (client-side echo, since we don't read back from the Sheet) ----
+  const HISTORY_KEY = "gastos_recent_v1";
+  const QUEUE_KEY = "gastos_pending_v1";
+
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+    catch { return []; }
+  }
+  function saveHistory(list) {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 8)));
+  }
+  function loadQueue() {
+    try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; }
+    catch { return []; }
+  }
+  function saveQueue(list) {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(list));
+  }
+
+  function fmtMoney(n, currency) {
+    return `${currency} ${Number(n).toFixed(2)}`;
+  }
+
+  function renderHistory() {
+    const history = loadHistory();
+    if (history.length === 0) {
+      recentListEl.innerHTML = `<div class="empty">Aún no hay gastos registrados.</div>`;
+      todayTotalEl.style.display = "none";
+      return;
+    }
+    recentListEl.innerHTML = history.map((h) => `
+      <div class="row">
+        <span>${h.category} · ${fmtMoney(h.amount, h.currency)}</span>
+        <span class="meta">${h.account} · ${h.date.slice(5)}</span>
+      </div>
+    `).join("");
+
+    const todayEntries = history.filter((h) => h.date === todayISO && h.currency === history[0].currency);
+    if (todayEntries.length) {
+      const total = todayEntries.reduce((s, h) => s + Number(h.amount), 0);
+      todayTotalEl.style.display = "flex";
+      todayTotalEl.innerHTML = `<span>Total hoy</span><span>${fmtMoney(total, todayEntries[0].currency)}</span>`;
+    } else {
+      todayTotalEl.style.display = "none";
+    }
+  }
+
+  renderHistory();
+  renderPendingPill();
+
+  function renderPendingPill() {
+    const queue = loadQueue();
+    let pill = document.querySelector(".pending-pill");
+    if (queue.length === 0) {
+      if (pill) pill.remove();
+      return;
+    }
+    if (!pill) {
+      pill = document.createElement("div");
+      pill.className = "pending-pill";
+      statusEl.insertAdjacentElement("afterend", pill);
+    }
+    pill.textContent = `⏳ ${queue.length} gasto(s) pendientes de sincronizar`;
+  }
+
+  // ---- send to Apps Script ----
+  async function sendToSheet(payload) {
+    // text/plain avoids a CORS preflight (Apps Script doesn't handle OPTIONS)
+    const res = await fetch(CONFIG.SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Error desconocido");
+    return data;
+  }
+
+  async function flushQueue() {
+    let queue = loadQueue();
+    if (queue.length === 0 || CONFIG.SCRIPT_URL.includes("PASTE_YOUR_WEB_APP_URL_HERE")) return;
+    const remaining = [];
+    for (const item of queue) {
+      try { await sendToSheet(item); }
+      catch { remaining.push(item); }
+    }
+    saveQueue(remaining);
+    renderPendingPill();
+  }
+
+  window.addEventListener("online", flushQueue);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") flushQueue();
+  });
+  flushQueue();
+
+  // ---- form submit ----
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const amount = $("#amount").value;
+    const currency = $("#currency").value;
+    const date = $("#date").value;
+    const method = getSelected("method");
+    const account = getSelected("account");
+    const category = getSelected("category");
+
+    if (!amount || Number(amount) <= 0) {
+      showStatus("Escribe un monto válido.", "err");
+      return;
+    }
+    if (!method || !account || !category) {
+      showStatus("Elige método, cuenta y categoría.", "err");
+      return;
+    }
+    if (CONFIG.SCRIPT_URL.includes("PASTE_YOUR_WEB_APP_URL_HERE")) {
+      showStatus("Falta configurar la URL de Apps Script.", "err");
+      return;
+    }
+
+    const payload = { amount: Number(amount), currency, date, method, account, category };
+
+    submitBtn.disabled = true;
+    showStatus("Guardando…", "");
+
+    try {
+      await sendToSheet(payload);
+      showStatus("✓ Guardado en la hoja de cálculo", "ok");
+      afterSuccess(payload);
+    } catch (err) {
+      // No hay conexión o falló el envío: lo guardamos para reintentar después
+      const queue = loadQueue();
+      queue.push(payload);
+      saveQueue(queue);
+      renderPendingPill();
+      showStatus("Sin conexión: se guardó localmente y se sincronizará después.", "err");
+      afterSuccess(payload);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  function afterSuccess(payload) {
+    const history = loadHistory();
+    history.unshift(payload);
+    saveHistory(history);
+    renderHistory();
+
+    form.reset();
+    $("#date").value = todayISO;
+    document.querySelectorAll(".chip.selected").forEach((c) => c.classList.remove("selected", "stamped"));
+    $("#amount").focus();
+  }
+
+  function showStatus(msg, cls) {
+    statusEl.textContent = msg;
+    statusEl.className = "status" + (cls ? " " + cls : "");
+  }
+
+  // ---- register service worker ----
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
